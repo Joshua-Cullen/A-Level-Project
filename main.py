@@ -105,7 +105,7 @@ class cell:
     def findDistance(self, coord):
         #calclate distance between coordinate and center of cell using pythagoras
         self.distance = math.sqrt((coord[0]-self.surface.centerx)**2 + (coord[1]-self.surface.centery)**2)
-s
+
 #create object for testing       
 s = ship(4)
 board = gameBoard()
