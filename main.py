@@ -9,12 +9,24 @@ clock = pygame.time.Clock()
 fps = 60
 dt = 0
 
+def checkDuplicate(data):
+    for item1 in data:
+        found = False
+        for item2 in data:
+            if item1 == item2 and not found:
+                found = True
+            elif item1 == item2 and found:
+                return True
+    return False
+
 class ship:
-    def __init__(self, length):
+    def __init__(self, length, startPos):
         self.length = length
         self.dimensions = 50
         self.placed = True
         self.surface = pygame.Rect(0, 0, self.dimensions, self.dimensions*length)
+        self.startPos = startPos
+        self.updatePoints()
 
         if self.length % 2 == 0:
             self.maxLim = maxLim = int(50*(self.length//2))+50
@@ -22,6 +34,18 @@ class ship:
         else:
             self.maxLim = int(50*(self.length//2))+50
             self.minLim = -int(50*(self.length//2))
+
+    def updatePoints(self):
+        self.points = []
+        for x in range(self.length):
+            if self.surface.height > self.surface.width:
+                #orientated vertically
+                self.points.append((self.surface.x, self.surface.y+(x*self.dimensions)))
+            else:
+                #orientated horizontally
+                self.points.append((self.surface.x+(x*self.dimensions), self.surface.y))
+            
+
     
     def update(self, mousePos, prevMousePos, click):
         self.shipPlacement(mousePos, prevMousePos, click)
@@ -38,28 +62,20 @@ class ship:
             #move by change in mouse movement
             self.surface.x += mousePos[0] - prevMousePos[0]
             self.surface.y += mousePos[1] - prevMousePos[1]
+            self.updatePoints()
         elif click == False and self.placed == False:
             #stop moving once mouse click released
             self.placed = True
-            if self.surface.height > self.surface.width:
-                #the ship is orientated vertically 
-                print(f"X boundary{self.surface.left, self.surface.right}")
-                print(f"Y boundary{self.surface.top, self.surface.bottom}")
-                if self.length % 2 == 0:
-                    #ship length is even
-                    coords = [board.closestCell((self.surface.center[0], self.surface.center[1]-(self.dimensions/2)+y)) for y in range(self.minLim, self.maxLim, self.dimensions)]
-                else:
-                    #ship length is uneven
-                    coords = [board.closestCell((self.surface.center[0], self.surface.center[1]+y)) for y in range(self.minLim, self.maxLim, self.dimensions)]
+            #the ship is orientated vertically 
+            coords = [board.closestCell(point) for point in self.points]
+            
+            #check for duplicates
+            if checkDuplicate(coords):
+                #there is a duplicate, reset position
+                self.surface.topleft = self.startPos
             else:
-                #the ship is orientated horizontally 
-                if self.length % 2 == 0:
-                    #ship length is even
-                    coords = [board.closestCell((self.surface.center[0]-(self.dimensions/2)+x, self.surface.center[1])) for x in range(self.minLim, self.maxLim, self.dimensions)]
-                else:
-                    #ship length is uneven
-                    coords = [board.closestCell((self.surface.center[0]+x, self.surface.center[1])) for x in range(self.minLim, self.maxLim, self.dimensions)]
-            print(f"Closest cell coordinates: {coords}")
+                #no duplicate, place ship
+                self.surface.topleft = coords[0]
 
 
     def rotate(self, mousePos):
@@ -85,7 +101,7 @@ class gameBoard():
                 if self.board[y][x].distance < self.board[closeCellPos[1]][closeCellPos[0]].distance:
                     closeCellPos = (x, y)
 
-        return self.board[closeCellPos[1]][closeCellPos[0]].surface.center
+        return self.board[closeCellPos[1]][closeCellPos[0]].surface.topleft
                 
     def update(self):
         #draw cells to screen
@@ -104,10 +120,11 @@ class cell:
 
     def findDistance(self, coord):
         #calclate distance between coordinate and center of cell using pythagoras
-        self.distance = math.sqrt((coord[0]-self.surface.centerx)**2 + (coord[1]-self.surface.centery)**2)
+        self.distance = math.sqrt((coord[0]-self.surface.x)**2 + (coord[1]-self.surface.y)**2)
+
 
 #create object for testing       
-s = ship(4)
+s = ship(4, (50,50))
 board = gameBoard()
 
 prevMousePos = (0,0)
