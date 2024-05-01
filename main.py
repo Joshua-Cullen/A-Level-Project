@@ -20,12 +20,14 @@ def checkDuplicate(data):
     return False
 
 class ship:
-    def __init__(self, length, startPos):
+    def __init__(self, length, startPos, colour):
         self.length = length
         self.dimensions = 50
         self.placed = True
-        self.surface = pygame.Rect(0, 0, self.dimensions, self.dimensions*length)
+        self.position = False
+        self.surface = pygame.Rect(startPos[0], startPos[1], self.dimensions, self.dimensions*length)
         self.startPos = startPos
+        self.colour = colour
         self.updatePoints()
 
     def updatePoints(self):
@@ -44,7 +46,7 @@ class ship:
         self.shipPlacement(mousePos, prevMousePos, click)
 
         #draw rectangle to screen
-        pygame.draw.rect(window, (255,0,0), self.surface)
+        pygame.draw.rect(window, self.colour, self.surface)
 
     def shipPlacement(self, mousePos, prevMousePos, click):
         if click and self.surface.collidepoint(mousePos[0], mousePos[1]):
@@ -56,21 +58,26 @@ class ship:
             self.surface.x += mousePos[0] - prevMousePos[0]
             self.surface.y += mousePos[1] - prevMousePos[1]
             self.updatePoints()
+            coords = [board.closestCell(point) for point in self.points]
+            board.changeBoardColour((255,255,255))
+            board.changeCellColour((0,255,0), coords)
+
         elif click == False and self.placed == False:
             #stop moving once mouse click released
-            self.placed = True 
+            self.placed = True
             coords = [board.closestCell(point) for point in self.points]
             
-            #check for duplicates
-            if checkDuplicate(coords):
+            #check for duplicates or if cells already contain ships (invalid positions)
+            if checkDuplicate(coords) or board.cellsContain(coords):
                 #there is a duplicate, reset position
                 self.surface.topleft = self.startPos
             else:
-                #no duplicate, place ship
-                self.surface.topleft = coords[0]
+                #place ship
+                self.surface.topleft = (coords[0][0]*self.dimensions, coords[0][1]*self.dimensions)
+                board.changeCellContents(coords, self)
+            board.changeBoardColour((255,255,255))
 
-
-    def rotate(self, mousePos):
+    def checkRotate(self, mousePos):
         #if currently selected, rotate
         if self.placed == False:
             #swap width and height
@@ -79,6 +86,7 @@ class ship:
             self.surface.height = width
             #set centre of rectangle to mouse position
             self.surface.center = mousePos
+            self.updatePoints()
 
 class gameBoard():
     def __init__(self):
@@ -92,8 +100,28 @@ class gameBoard():
                 self.board[y][x].findDistance(coord)
                 if self.board[y][x].distance < self.board[closeCellPos[1]][closeCellPos[0]].distance:
                     closeCellPos = (x, y)
+        
+        return closeCellPos
+    
+    def changeCellColour(self, colour, points):
+        for coord in points:
+            self.board[coord[1]][coord[0]].colour = colour
 
-        return self.board[closeCellPos[1]][closeCellPos[0]].surface.topleft
+    def changeBoardColour(self, colour):
+        for y in range(10):
+            for x in range(10):
+                self.board[y][x].colour = colour
+
+    def cellsContain(self, coords):
+        for coord in coords:
+            if self.board[coord[1]][coord[0]].value != None:
+                return True
+        return False
+    
+    def changeCellContents(self, coords, newVal):
+        for coord in coords:
+            self.board[coord[1]][coord[0]].value = newVal
+
                 
     def update(self):
         #draw cells to screen
@@ -105,10 +133,11 @@ class cell:
     def __init__(self, x, y):
         self.surface = pygame.Rect(x*50, y*50, 50, 50)
         self.colour = (255,255,255)
+        self.value = None
 
     def update(self):
         #draw cell to screen
-        pygame.draw.rect(window, self.colour, self.surface, width=1)
+        pygame.draw.rect(window, self.colour, self.surface)
 
     def findDistance(self, coord):
         #calclate distance between coordinate and center of cell using pythagoras
@@ -116,7 +145,7 @@ class cell:
 
 
 #create object for testing       
-s = ship(4, (50,50))
+ships = [ship(4, (50,50), (255,0,0)), ship(3, (100,100), (0,0,255))]
 board = gameBoard()
 
 prevMousePos = (0,0)
@@ -132,7 +161,8 @@ while running:
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_r:
                 #when r is pressed, rotate the ship
-                s.rotate(mousePos)
+                for obj in ships:
+                    obj.checkRotate(mousePos)
 
     #get the mouse details 
     mousePos = pygame.mouse.get_pos()
@@ -141,7 +171,9 @@ while running:
     #draw objects to the screen
     window.fill((0,0,0))
     board.update()
-    s.update(mousePos, prevMousePos, click)
+
+    for obj in ships:
+        obj.update(mousePos, prevMousePos, click)
 
     prevMousePos = mousePos
 
