@@ -41,13 +41,11 @@ class ship:
                 #orientated horizontally
                 self.points.append((self.surface.x+(x*self.dimensions), self.surface.y))
             
-    def update(self, mousePos, prevMousePos, click):
-        self.shipPlacement(mousePos, prevMousePos, click)
-
+    def update(self):
         #draw rectangle to screen
         pygame.draw.rect(window, self.colour, self.surface)
 
-    def shipPlacement(self, mousePos, prevMousePos, click):
+    def shipPlacement(self, mousePos, prevMousePos, click, board):
         global shipSelected
         if click and self.surface.collidepoint(mousePos[0], mousePos[1]) and shipSelected == False:
             #start moving if rectangle clicked
@@ -65,17 +63,23 @@ class ship:
             self.updatePoints()
             coords = [board.closestCell(point) for point in self.points]
             board.changeBoardColour((255,255,255))
-            board.changeCellColour((0,255,0), coords)
+
+            if checkDuplicate(coords) or board.cellsContain(coords):
+                #position invalid
+                board.changeCellColour((255,0,0), coords)
+            else:
+                #position valid
+                board.changeCellColour((0,255,0), coords)
 
         elif click == False and self.selected:
             #stop moving once mouse click released
-            self.selected = False
-            shipSelected = False
             coords = [board.closestCell(point) for point in self.points]
             
             #check for duplicates or if cells already contain ships (invalid positions)
             if checkDuplicate(coords) or board.cellsContain(coords):
                 #there is a duplicate, reset position
+                if self.surface.width > self.surface.height:
+                    self.checkRotate()
                 self.surface.topleft = self.startPos
             else:
                 #place ship
@@ -88,7 +92,12 @@ class ship:
                 board.changeCellContents(coords, self)
             board.changeBoardColour((255,255,255))
 
-    def checkRotate(self, mousePos):
+            self.selected = False
+            shipSelected = False
+
+        return board
+
+    def checkRotate(self):
         #if currently selected, rotate
         if self.selected:
             #swap width and height
@@ -154,14 +163,70 @@ class cell:
         #calclate distance between coordinate and center of cell using pythagoras
         self.distance = math.sqrt((coord[0]-self.surface.x)**2 + (coord[1]-self.surface.y)**2)
 
+class player:
+    def __init__(self, id):
+        self.shipBoard = gameBoard()
+        self.hitBoard = gameBoard()
+        self.ships = [ship(4, (525,25,50), "darkgray"), ship(3, (600, 25), "darkgray")]
+        self.placingShips = True
+        self.readyButton = button(550,300, 100, 50)
+        self.finishedStep = False
+
+    def update(self):
+        if self.placingShips:
+            self.placeShips()
+
+        return self.finishedStep
+
+    def placeShips(self):
+        self.shipBoard.update()
+        for ship in self.ships:
+            ship.shipPlacement(mousePos, prevMousePos, click, self.shipBoard)
+            ship.update()
+
+        if self.readyButton.update():
+            ready = True
+            for ship in self.ships:
+                if ship.shipPlaced == False:
+                    ready = False
+            
+            if ready:
+                self.finishedStep = True
+                self.placingShips = False
+
+    def keyPress(self, key):
+        if key == pygame.K_r and self.placingShips:
+            for ship in self.ships:
+                ship.checkRotate()
+
+def switchPlayer(currentPlayer):
+    if players[currentPlayer] == players[0]:
+        currentPlayer = 1
+    else:
+        currentPlayer = 0
+    return currentPlayer
+
+class button:
+    def __init__(self, x, y, width, height):
+        self.surface = pygame.Rect(x, y, width, height)
+    
+    def update(self):
+        pygame.draw.rect(window, (255,255,255), self.surface)
+
+        if self.surface.collidepoint(mousePos) and click and prevClick == False:
+            return True
+        else:
+            return False
+
 
 #create object for testing       
-ships = [ship(4, (50,50), (255,0,0)), ship(3, (100,100), (0,0,255))]
-board = gameBoard()
+players = [player("1"), player("2")]
+currentPlayer = 0
 
 shipSelected = False
 
 prevMousePos = (0,0)
+prevClick = False
 
 #game loop
 running = True
@@ -172,10 +237,7 @@ while running:
             running = False
 
         elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_r:
-                #when r is pressed, rotate the ship
-                for obj in ships:
-                    obj.checkRotate(mousePos)
+            players[currentPlayer].keyPress(event.key)
 
     #get the mouse details 
     mousePos = pygame.mouse.get_pos()
@@ -183,12 +245,13 @@ while running:
 
     #draw objects to the screen
     window.fill((0,0,0))
-    board.update()
 
-    for obj in ships:
-        obj.update(mousePos, prevMousePos, click)
+    if players[currentPlayer].update():
+        #if true, then switch player
+        currentPlayer = switchPlayer(currentPlayer)
 
     prevMousePos = mousePos
+    prevClick = click
 
     #update window and get time difference between frames
     pygame.display.update()
