@@ -82,7 +82,7 @@ class ship:
                     self.checkRotate()
                 self.surface.topleft = self.startPos
             else:
-                #place ship
+                #place ship (self.points now is used to store the cell coordinates)
                 self.points = []
                 for coord in coords:
                     self.points.append(coord)
@@ -124,21 +124,25 @@ class gameBoard():
         return closeCellPos
     
     def changeCellColour(self, colour, points):
+        #change particular cell colours 
         for coord in points:
             self.board[coord[1]][coord[0]].colour = colour
 
     def changeBoardColour(self, colour):
+        #reset the entire board colour 
         for y in range(10):
             for x in range(10):
                 self.board[y][x].colour = colour
 
     def cellsContain(self, coords):
+        #check if cells contain a value other than None
         for coord in coords:
             if self.board[coord[1]][coord[0]].value != None:
                 return True
         return False
     
     def changeCellContents(self, coords, newVal):
+        #update the contents of certain cells to newVal
         for coord in coords:
             self.board[coord[1]][coord[0]].value = newVal
 
@@ -165,6 +169,7 @@ class cell:
 
 class player:
     def __init__(self, id):
+        self.id = id 
         self.shipBoard = gameBoard()
         self.hitBoard = gameBoard()
         self.ships = [ship(4, (525,25,50), "darkgray"), ship(3, (600, 25), "darkgray")]
@@ -185,21 +190,27 @@ class player:
             ship.update()
 
         if self.readyButton.update():
+            #when ready button clicked
+
+            #check if all ships have been placed
             ready = True
             for ship in self.ships:
                 if ship.shipPlaced == False:
                     ready = False
             
+            #if all ships are placed, then move onto next step 
             if ready:
                 self.finishedStep = True
                 self.placingShips = False
 
     def keyPress(self, key):
         if key == pygame.K_r and self.placingShips:
+            #when r is pressed, rotate the ship currently selected 
             for ship in self.ships:
                 ship.checkRotate()
 
 def switchPlayer(currentPlayer):
+    #switches between the players in the list
     if players[currentPlayer] == players[0]:
         currentPlayer = 1
     else:
@@ -211,9 +222,11 @@ class button:
         self.surface = pygame.Rect(x, y, width, height)
     
     def update(self):
+        #draws the buttton to the screen 
         pygame.draw.rect(window, (255,255,255), self.surface)
 
         if self.surface.collidepoint(mousePos) and click and prevClick == False:
+            #if the button is pressed 
             return True
         else:
             return False
