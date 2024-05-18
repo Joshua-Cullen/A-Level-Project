@@ -1,7 +1,7 @@
 import pygame, math
 
 pygame.init()
-window = pygame.display.set_mode((1000,1000))
+window = pygame.display.set_mode((800,800))
 clock = pygame.time.Clock()
 fps = 60
 dt = 0
@@ -83,8 +83,25 @@ def shipPlacement(player):
         return player, True
     return player, False
 
-def takingGo(player):
-    pass
+def takeGo(player):
+    global prevCell
+    cell = player.hitBoard.selectedCell(mousePos)
+
+    player.hitBoard.changeCellColour((255,255,255), [prevCell])
+    if cell != None:
+        #the mouse is hovering over a cell
+        player.hitBoard.changeCellColour("darkgray", [cell])
+
+        if click:
+            #when a cell is clicked
+            if player.hitBoard.cellsContain([cell]):
+                print("HIT")
+            else:
+                print("MISS")
+
+        prevCell = cell
+
+    player.hitBoard.update()
 
 class ship:
     def __init__(self, id, length, startPos, colour):
@@ -151,6 +168,13 @@ class gameBoard():
         
         return closeCellPos
     
+    def selectedCell(self, coord):
+        for y in range(10):
+            for x in range(10):
+                if self.board[y][x].surface.collidepoint(coord):
+                    return (x,y)
+        return None
+    
     def changeCellColour(self, colour, points):
         #change particular cell colours 
         for coord in points:
@@ -199,9 +223,10 @@ class player:
     def __init__(self):
         self.ships = [ship("1", 4, (525,25), "darkgray"), ship("2", 3, (600, 25), "darkgray")]
         self.shipBoard = gameBoard()
+        self.hitBoard = gameBoard()
 
-        self.placingShips = True
-        self.takingGo = False
+        self.placingShips = False
+        self.takingGo = True
 
     def update(self):
         if self.placingShips:
@@ -212,6 +237,7 @@ class player:
         
         elif self.takingGo:
             finished = False
+            takeGo(self)
 
         return finished
     
@@ -232,6 +258,7 @@ class button:
 players = [player(), player()]
 currentPlayer = 0
 shipSelected = None
+prevCell = (0,0)
 
 readyButton = button(550,300, 100, 50)
 
