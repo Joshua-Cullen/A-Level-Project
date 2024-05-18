@@ -1,5 +1,5 @@
 #import required libraries
-import pygame, math
+import pygame, math, time
 
 #initialise pygame
 pygame.init()
@@ -45,7 +45,7 @@ class ship:
         #draw rectangle to screen
         pygame.draw.rect(window, self.colour, self.surface)
 
-    def shipPlacement(self, mousePos, prevMousePos, click, board):
+    def shipPlacement(self, board):
         global shipSelected
         if click and self.surface.collidepoint(mousePos[0], mousePos[1]) and shipSelected == False:
             #start moving if rectangle clicked
@@ -107,10 +107,23 @@ class ship:
             #set centre of rectangle to mouse position
             self.surface.center = mousePos
             self.updatePoints()
+        
+    def checkHit(self, coord):
+        if coord in self.points:
+            self.points.remove(coord)
+        
+            if len(self.points) == 0:
+                return "Sunk"
+            return "Hit"
+        
+        else:
+            return "Miss"
+
 
 class gameBoard():
     def __init__(self):
         self.board = [[cell(x,y) for x in range(10)] for y in range(10)]
+        self.surface = pygame.Rect(0,0,500,500)
 
     def closestCell(self, coord):
         #find the closest cell to a coordinate
@@ -122,6 +135,12 @@ class gameBoard():
                     closeCellPos = (x, y)
         
         return closeCellPos
+    
+    def selectedCell(self, coord):
+        for y in range(10):
+            for x in range(10):
+                if self.board[y][x].surface.collidepoint(coord):
+                    return (x,y)
     
     def changeCellColour(self, colour, points):
         #change particular cell colours 
@@ -168,25 +187,38 @@ class cell:
         self.distance = math.sqrt((coord[0]-self.surface.x)**2 + (coord[1]-self.surface.y)**2)
 
 class player:
-    def __init__(self, id):
-        self.id = id 
+    def __init__(self, colour):
+        #initialise variables
+        self.colour = colour
         self.shipBoard = gameBoard()
         self.hitBoard = gameBoard()
         self.ships = [ship(4, (525,25,50), "darkgray"), ship(3, (600, 25), "darkgray")]
-        self.placingShips = True
         self.readyButton = button(550,300, 100, 50)
+
+        #boolean variables to indicate the current status of the game
+        self.placingShips = True
+        self.takingGo = False
         self.finishedStep = False
+        self.startTimer = False
+        self.timeElapsed = 0
 
     def update(self):
+        #decides which method to call depending on the status
+        self.finishedStep = False
         if self.placingShips:
             self.placeShips()
+        elif self.takingGo:
+            self.takeGo()
 
+        pygame.draw.rect(window, self.colour, [550,50, 50, 50])
+
+        #when finishedStep is True, one of the methods has finished executing, time to switch player
         return self.finishedStep
 
     def placeShips(self):
         self.shipBoard.update()
         for ship in self.ships:
-            ship.shipPlacement(mousePos, prevMousePos, click, self.shipBoard)
+            ship.shipPlacement(self.shipBoard)
             ship.update()
 
         if self.readyButton.update():
@@ -202,12 +234,43 @@ class player:
             if ready:
                 self.finishedStep = True
                 self.placingShips = False
+                self.takingGo = True
+
+        return self.finishedStep
 
     def keyPress(self, key):
         if key == pygame.K_r and self.placingShips:
             #when r is pressed, rotate the ship currently selected 
             for ship in self.ships:
                 ship.checkRotate()
+
+    def takeGo(self):
+        enemyBoard = players[switchPlayer(currentPlayer)].shipBoard
+        enemyBoard.update()
+
+        selectCell = enemyBoard.selectedCell(mousePos)
+        if selectCell != None:
+        
+            if click and prevClick == False and self.startTimer == False:
+                players[switchPlayer(currentPlayer)].shipBoard.changeCellColour((0,255,0), [selectCell])
+                hit = "Miss"
+                for index, ship in enumerate(players[switchPlayer(currentPlayer)].ships):
+                    if selectCell in ship.points:
+                        players[switchPlayer(currentPlayer)].shipBoard.changeCellColour((255,0,0), [selectCell])
+
+                        hit = players[switchPlayer(currentPlayer)].ships[index].checkHit(selectCell)
+                    break
+
+                print(hit)
+                self.startTimer = True
+
+        if self.startTimer:
+            self.timeElapsed += dt
+            if self.timeElapsed >= 2:
+                self.timeElapsed = 0
+                self.startTimer = False
+                self.finishedStep = True
+        return self.finishedStep
 
 def switchPlayer(currentPlayer):
     #switches between the players in the list
@@ -233,7 +296,7 @@ class button:
 
 
 #create object for testing       
-players = [player("1"), player("2")]
+players = [player((255,0,0)), player((0,255,0))]
 currentPlayer = 0
 
 shipSelected = False
