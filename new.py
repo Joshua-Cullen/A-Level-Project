@@ -6,6 +6,7 @@ clock = pygame.time.Clock()
 fps = 60
 dt = 0
 running = True
+arial = pygame.font.SysFont("arial", 50)
 
 def switchPlayer(currentPlayer):
     #switches between the players in the list
@@ -25,83 +26,153 @@ def checkDuplicate(data):
                 return True
     return False
 
+def displayText(font, text, pos, colour):
+    text = font.render(text, True, colour)
+    window.blit(text, pos)
+
+
 def shipPlacement(player):
     global shipSelected
-    player.shipBoard.changeBoardColour((255,255,255))
+    player.board.changeBoardColour((255,255,255))
     for index in range(len(player.ships)):
         shipSelected = player.ships[index].checkSelected(shipSelected)
 
         if player.ships[index].selected and click:
+            #if the ship is currently being hovered over and clicked
             if player.ships[index].placed:
                 #if the ship has already been placed, then change cell values back to None
-                player.shipBoard.changeCellContents(player.ships[index].points, None)
+                player.board.changeCellContents(player.ships[index].points, None)
                 player.ships[index].placed = False
 
             #ship is currently selected and being moved
             player.ships[index].surface.x += mousePos[0] - prevMousePos[0]
             player.ships[index].surface.y += mousePos[1] - prevMousePos[1]
             player.ships[index].updatePoints()
-            coords = [player.shipBoard.closestCell(point) for point in player.ships[index].points]
+            coords = [player.board.closestCell(point) for point in player.ships[index].points]
 
-            if checkDuplicate(coords) or player.shipBoard.cellsContain(coords):
+            if checkDuplicate(coords) or player.board.cellsContain(coords):
                 #position invalid
-                player.shipBoard.changeCellColour((255,0,0), coords)
+                player.board.changeCellColour((255,0,0), coords)
             else:
                 #position valid
-                player.shipBoard.changeCellColour((0,255,0), coords)
+                player.board.changeCellColour((0,255,0), coords)
 
         elif player.ships[index].selected and click == False:
             #ship was being moved but has now been released - needs to be placed
-            coords = [player.shipBoard.closestCell(point) for point in player.ships[index].points]
+            coords = [player.board.closestCell(point) for point in player.ships[index].points]
 
             #check for duplicates or if cells already contain another ship
-            if checkDuplicate(coords) or player.shipBoard.cellsContain(coords):
+            if checkDuplicate(coords) or player.board.cellsContain(coords):
                 #there is a duplicate, reset position
                 player.ships[index].resetPos()
             
             else:
                 #place ship (self.points now is used to store the cell coordinates)
                 player.ships[index].points = []
+                player.ships[index].origPoints = []
                 for coord in coords:
                     player.ships[index].points.append(coord)
+                    player.ships[index].origPoints.append(coord)
 
+                #place ship in new position 
                 player.ships[index].surface.topleft = (coords[0][0]*player.ships[index].dimensions, coords[0][1]*player.ships[index].dimensions)
-                player.shipBoard.changeCellContents(coords, player.ships[index].id)
+                player.board.changeCellContents(coords, player.ships[index].id)
 
+                #change boolean values
                 player.ships[index].placed = True
                 player.ships[index].selected = False
             shipSelected = None
 
-    player.shipBoard.update()
+    #draw the ships and board to the screen
+    player.board.update()
     for ship in player.ships:
         ship.update()
 
     if readyButton.update():
+        #if the button is clicked
         for ship in player.ships:
             if ship.placed == False:
                 return player, False
         return player, True
     return player, False
+    #if the button has been pressed and all ships have been placed, then return player, True
+    #else return player, False 
 
-def takeGo(player):
-    global prevCell
-    cell = player.hitBoard.selectedCell(mousePos)
+def takeGo(player, enemy):
+    global paused, timeElapsed, msg
+    finished = False
 
-    player.hitBoard.changeCellColour((255,255,255), [prevCell])
-    if cell != None:
-        #the mouse is hovering over a cell
-        player.hitBoard.changeCellColour("darkgray", [cell])
+    if paused == False:
+        player.board.changeBoardColour((255,255,255))
+        #find the cell the user is currently hovering over
+        cell = player.board.selectedCell(mousePos)
 
-        if click:
-            #when a cell is clicked
-            if player.hitBoard.cellsContain([cell]):
-                print("HIT")
-            else:
-                print("MISS")
+        if cell != None:
+            #the mouse is hovering over a cell
+            player.board.changeCellColour("darkgray", [cell])
 
-        prevCell = cell
+            if click:
+                #when a cell is clicked
+                if player.board.board[cell[1]][cell[0]].hit == False:
+                    #the position has not already been selected
 
-    player.hitBoard.update()
+                    #find the relevant ship and remove the point from the ship 
+                    for ship in enemy.ships:
+                        result = ship.checkHit(cell)
+                        if result == "hit":
+                            msg = "Hit"
+                            player.board.board[cell[1]][cell[0]].value = "hit"
+                            break
+                        elif result == "sunk":
+                            player.board.changeCellContents(ship.origPoints, "sunk")
+                            enemy.ships.remove(ship)
+                            msg = "Sunk"
+                            break
+                    
+                    if result == None:
+                        #the selected cell has missed all enemy ships 
+                        msg = "Miss"
+                        player.board.board[cell[1]][cell[0]].value = "miss"
+
+                    paused = True
+
+                else:
+                    #already selected  
+                    pass
+
+                player.board.board[cell[1]][cell[0]].hit = True
+
+    else:
+        #create a pause of 2 seconds 
+        timeElapsed += dt
+        displayText(arial, msg, (550,0), (255,255,255)) 
+        if timeElapsed > 2:
+            paused = False 
+            timeElapsed = 0 
+            finished = True
+
+    player.board.showHits()
+
+    return player, enemy, finished, len(enemy.ships) == 0 and not(paused)
+
+class computer:
+    def __init__(self, id):
+        self.id = id
+
+    def placeShips(self):
+        pass
+
+class easy(computer):
+    def chooseSpot(self):
+        pass
+
+class medium(computer):
+    def chooseSpot(self):
+        pass
+
+class hard(computer):
+    def chooseSpot(self):
+        pass
 
 class ship:
     def __init__(self, id, length, startPos, colour):
@@ -132,6 +203,19 @@ class ship:
             
             self.selected = shipSelected == self.id
         return shipSelected
+    
+    def checkHit(self, coord):
+        if coord in self.points:
+            #if the ship has been hit, remove the point from points
+            self.points.remove(coord)
+
+            if len(self.points) == 0:
+                #if all the ship's points have been hit, it has been sunk
+                return "sunk"
+            return "hit"
+        
+        #return none if the coord did not hit this specific ship 
+        return None
     
     def resetPos(self):
         if self.surface.width > self.surface.height:
@@ -167,6 +251,20 @@ class gameBoard():
                     closeCellPos = (x, y)
         
         return closeCellPos
+    
+    def showHits(self):
+        for row in self.board:
+            for cell in row:
+                if cell.value == "hit":
+                    colour = (0,255,0)
+                elif cell.value == "miss":
+                    colour = (255,0,0)
+                elif cell.value == "sunk":
+                    colour = (255,255,0)
+                else:
+                    colour = cell.colour
+                    
+                pygame.draw.rect(window, colour, cell.surface)
     
     def selectedCell(self, coord):
         for y in range(10):
@@ -210,6 +308,7 @@ class cell:
         self.surface = pygame.Rect(x*50, y*50, 50, 50)
         self.colour = (255,255,255)
         self.value = None
+        self.hit = False
 
     def update(self):
         #draw cell to screen
@@ -220,15 +319,16 @@ class cell:
         self.distance = math.sqrt((coord[0]-self.surface.x)**2 + (coord[1]-self.surface.y)**2)
 
 class player:
-    def __init__(self):
+    def __init__(self, id):
         self.ships = [ship("1", 4, (525,25), "darkgray"), ship("2", 3, (600, 25), "darkgray")]
-        self.shipBoard = gameBoard()
-        self.hitBoard = gameBoard()
+        self.board = gameBoard()
 
-        self.placingShips = False
-        self.takingGo = True
+        self.placingShips = True
+        self.takingGo = False
 
-    def update(self):
+        self.id = id 
+
+    def update(self, enemy):
         if self.placingShips:
             self, finished = shipPlacement(self)
 
@@ -236,10 +336,16 @@ class player:
             self.takingGo = finished
         
         elif self.takingGo:
-            finished = False
-            takeGo(self)
+            self, enemy, finished, won = takeGo(self, enemy)
+            if won:
+                return enemy, "won"
 
-        return finished
+        else:
+            finished = False
+
+        displayText(arial, self.id, (550,75), (255,255,255))
+
+        return enemy, finished
     
 class button:
     def __init__(self, x, y, width, height):
@@ -255,12 +361,17 @@ class button:
         else:
             return False
 
-players = [player(), player()]
+players = [player("Player 1"), player("Player 2")]
 currentPlayer = 0
 shipSelected = None
-prevCell = (0,0)
 
 readyButton = button(550,300, 100, 50)
+
+paused = False
+timeElapsed = 0
+
+game = True
+winScreen = False
 
 prevClick = False
 prevMousePos = (0,0)
@@ -281,10 +392,18 @@ while running:
     mousePos = pygame.mouse.get_pos()
     click = pygame.mouse.get_pressed()[0]
 
-    if players[currentPlayer].update():
-        currentPlayer = switchPlayer(currentPlayer)
+    if game:
+        players[switchPlayer(currentPlayer)], finished = players[currentPlayer].update(players[switchPlayer(currentPlayer)])
+        if finished == True:
+            currentPlayer = switchPlayer(currentPlayer)
+        elif finished == "won":
+            winScreen = True
+            game = False
+
+    elif winScreen:
+        displayText(arial, f'{players[currentPlayer].id} has won', (0,0), (255,255,255))
     
     prevClick = click
     prevMousePos = mousePos
     pygame.display.update()
-    dt = clock.tick(fps)
+    dt = clock.tick(fps) / 1000
